@@ -1,0 +1,5 @@
+- Encrypt password (bcrypt)
+- Create JSON tokens for login
+- Set up rate limiting (express-rate-limit)
+- Validate requests
+- Implement ESLint security (eslint-plugin-security)

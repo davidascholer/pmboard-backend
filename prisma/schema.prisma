@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?   @db.VarChar(255)
+  email         String    @unique @db.VarChar(255)
+  settings      Json      @default("{}") @db.Json
+  createdAt     DateTime  @default(now()) @db.Timestamp(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamp(3)
+  projectsOwned Project[]
+}
+
+model Project {
+  id          String          @id @default(uuid())
+  name        String          @db.VarChar(255)
+  description String?
+  createdAt   DateTime        @default(now()) @db.Timestamp(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamp(3)
+  projectType ProjectType     @default(KANBAN)
+  owner       User            @relation(fields: [ownerId], references: [id])
+  ownerId     String          @unique
+  members     ProjectMember[]
+  tickets     Ticket[]
+  features    Feature[]
+}
+
+model Feature {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(255)
+  description String?
+  createdAt   DateTime @default(now()) @db.Timestamp(3)
+  projectId   String   @unique
+  project     Project  @relation(fields: [projectId], references: [id])
+  tickets     Ticket[]
+}
+
+model Ticket {
+  id              String          @id @default(uuid())
+  title           String          @db.VarChar(255)
+  description     String?
+  createdAt       DateTime        @default(now()) @db.Timestamp(3)
+  updatedAt       DateTime        @updatedAt @db.Timestamp(3)
+  section         Section         @default(ACTIVE)
+  status          Status          @default(UNASSIGNED)
+  severity        Priority        @default(LOW)
+  timeEstimateMin Int?
+  Project         Project         @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  projectId       String
+  feature         Feature?        @relation(fields: [featureId], references: [id])
+  featureId       Int?            @unique
+  assignees       ProjectMember[]
+}
+
+// Extends a User for a project
+model ProjectMember {
+  id        String   @id @default(uuid())
+  userId    String
+  role      Role     @default(MEMBER)
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  tickets   Ticket[]
+}
+
+enum Section {
+  ACTIVE
+  ARCHIVED
+  BACKLOG
+}
+
+enum Status {
+  UNASSIGNED
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+}
+
+enum ProjectType {
+  WATERFALL
+  KANBAN
+  SCRUM
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  TESTER
+  GUEST
+}
+
+enum Permissions {
+  EDIT_PROJECT
+  EDIT_MEMBERS
+  ADD_TICKET
+  DELETE_TICKET
+  MOVE_TICKET
+  ASSIGN_TICKET_SELF
+  UNASSIGN_TICKET_SELF
+}
+
+enum Priority {
+  LOW
+  MODERATE
+  HIGH
+  URGENT
+}
