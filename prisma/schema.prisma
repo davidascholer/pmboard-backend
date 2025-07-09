@@ -9,24 +9,26 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  name          String?   @db.VarChar(255)
-  email         String    @unique @db.VarChar(255)
-  settings      Json      @default("{}") @db.Json
-  createdAt     DateTime  @default(now()) @db.Timestamp(3)
-  updatedAt     DateTime  @updatedAt @db.Timestamp(3)
-  projectsOwned Project[]
+  id             String          @id @default(uuid())
+  name           String?         @db.VarChar(255)
+  email          String          @unique @db.VarChar(255)
+  password       String          @db.VarChar(255)
+  settings       Json            @default("{}") @db.Json
+  createdAt      DateTime        @default(now()) @db.Timestamp(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamp(3)
+  projectsOwned  Project[]
+  projectsJoined ProjectMember[]
 }
 
 model Project {
   id          String          @id @default(uuid())
+  owner       User            @relation(fields: [ownerId], references: [id])
+  ownerId     String          @unique
   name        String          @db.VarChar(255)
   description String?
   createdAt   DateTime        @default(now()) @db.Timestamp(3)
   updatedAt   DateTime        @updatedAt @db.Timestamp(3)
   projectType ProjectType     @default(KANBAN)
-  owner       User            @relation(fields: [ownerId], references: [id])
-  ownerId     String          @unique
   members     ProjectMember[]
   tickets     Ticket[]
   features    Feature[]
@@ -61,12 +63,14 @@ model Ticket {
 
 // Extends a User for a project
 model ProjectMember {
-  id        String   @id @default(uuid())
-  userId    String
-  role      Role     @default(MEMBER)
-  project   Project  @relation(fields: [projectId], references: [id])
-  projectId String
-  tickets   Ticket[]
+  id           String       @id @default(uuid())
+  userId       String
+  role         Role         @default(MEMBER)
+  memberStatus MemberStatus @default(PENDING)
+  project      Project      @relation(fields: [projectId], references: [id])
+  projectId    String
+  tickets      Ticket[]
+  User         User         @relation(fields: [userId], references: [id])
 }
 
 enum Section {
@@ -111,4 +115,10 @@ enum Priority {
   MODERATE
   HIGH
   URGENT
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
 }

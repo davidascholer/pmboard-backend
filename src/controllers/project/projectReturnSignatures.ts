@@ -1,7 +1,6 @@
 /**
  This file contains the return signatures for project-related queries.
  It defines the structure of the data required for the respective responses.
- Data not included is intentionally commented out for toggle ability.
  **/
 
 
