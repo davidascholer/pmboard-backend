@@ -30,7 +30,6 @@ export const authenticate = async (
       email: string;
       id: string;
     };
-    console.log("Decoded token:", decode);
     const user = await prisma.user.findUnique({
       where: { email: decode.email },
     });

@@ -3,7 +3,7 @@ import userReturnSelect from "./userReturnSignatures";
 import prisma from "../../prismaClient";
 import { User } from "@prisma/client";
 import { hash, compare } from "bcrypt";
-import { generateJWT } from "./util";
+import { generateJWT } from "../auth/util";
 import { AuthenticatedRequest } from "../../middleware/auth";
 
 export const getUser = async (req: Request, res: Response) => {
@@ -30,7 +30,7 @@ export const getUser = async (req: Request, res: Response) => {
       .catch((error: any) => {
         console.error("Error fetching user:", error);
         res.status(400).json({
-          message: "An error occurred while fetching projects",
+          message: "An error occurred while fetching the user",
         });
       });
 
@@ -49,9 +49,15 @@ export const getUser = async (req: Request, res: Response) => {
       });
     }
 
-    // Successfully return the user info
+    // Successfully return the user info w access and refresh tokens
     const { password: _password, ...userWithoutPassword } = user;
-    res.status(200).json({ ...userWithoutPassword, access: generateJWT(user) });
+    res
+      .status(200)
+      .json({
+        ...userWithoutPassword,
+        a: generateJWT(user, "access", "1h"),
+        r: generateJWT(user, "refresh", "30d"),
+      });
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({
@@ -114,27 +120,15 @@ export const createUser = async (req: Request, res: Response) => {
     const { password: _password, ...newUserWithoutPassword } = newUser;
     res
       .status(201)
-      .json({ ...newUserWithoutPassword, access: generateJWT(newUser) });
+      .json({
+        ...newUserWithoutPassword,
+        a: generateJWT(newUser, "access", "1h"),
+        r: generateJWT(newUser, "refresh", "30d"),
+      });
   } catch (error) {
     console.error("Error creating user:", error);
     res.status(500).json({
       message: "An error occurred while creating user",
     });
   }
-};
-
-export const authenticateUser = async (
-  req: AuthenticatedRequest,
-  res: Response
-) => {
-  // Check if the user is authenticated
-  if (!req.user) {
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
-  }
-
-  // Return the authenticated user info
-  const { password: _password, ...userWithoutPassword } = req.user;
-  res.status(200).json(userWithoutPassword);
 };

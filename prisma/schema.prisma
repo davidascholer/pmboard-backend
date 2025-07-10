@@ -52,7 +52,7 @@ model Ticket {
   updatedAt       DateTime        @updatedAt @db.Timestamp(3)
   section         Section         @default(ACTIVE)
   status          Status          @default(UNASSIGNED)
-  severity        Priority        @default(LOW)
+  priority        Priority        @default(LOW)
   timeEstimateMin Int?
   Project         Project         @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   projectId       String
