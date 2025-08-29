@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import prisma from "../../prismaClient";
 import { generateJWT } from "./util";
-import { verify } from "jsonwebtoken";
 import { AuthenticatedRequest } from "../../middleware/auth";
+import jwt from "jsonwebtoken";
 
 export const authenticateUser = async (
   req: AuthenticatedRequest,
@@ -36,7 +36,7 @@ export const refreshToken = async (req: Request, res: Response) => {
       });
     }
 
-    const decode = verify(req.body.r, process.env.JWT_SECRET) as {
+    const decode = jwt.verify(req.body.r, process.env.JWT_SECRET) as {
       email: string;
       id: string;
     };
