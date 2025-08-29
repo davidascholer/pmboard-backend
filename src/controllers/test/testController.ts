@@ -23,3 +23,8 @@ export const postTest = async (req: Request, res: Response) => {
     .status(201)
     .json({ message: "New test entry created!", data: newTest });
 };
+
+export const deleteAllTests = async (req: Request, res: Response) => {
+  await prisma.test.deleteMany({});
+  return res.status(200).json({ message: "All test entries deleted." });
+};
