@@ -1,24 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../../prismaClient";
 import { generateJWT } from "./util";
-import { AuthenticatedRequest } from "../../middleware/auth";
 import jwt from "jsonwebtoken";
-
-export const authenticateUser = async (
-  req: AuthenticatedRequest,
-  res: Response
-) => {
-  // Check if the user is authenticated
-  if (!req.user) {
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
-  }
-
-  // Return the authenticated user info
-  const { password: _password, ...userWithoutPassword } = req.user;
-  res.status(200).json(userWithoutPassword);
-};
 
 export const refreshToken = async (req: Request, res: Response) => {
   try {

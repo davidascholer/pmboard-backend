@@ -1,4 +1,4 @@
-import { getTest, postTest } from "./testController";
+import { getTest, postTest, deleteAllTests } from "./testController";
 
 describe("Test Controller", () => {
   test("test get before post", async () => {
@@ -57,7 +57,6 @@ describe("Test Controller", () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
     };
-    const { deleteAllTests } = await import("./testController");
     await deleteAllTests(mockRequest as any, mockResponse as any);
     expect(mockResponse.status).toHaveBeenCalledWith(200);
   });

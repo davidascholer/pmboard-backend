@@ -15,34 +15,65 @@ model Test {
 
 model User {
   id             String          @id @default(uuid())
-  name           String?         @db.VarChar(255)
+  name           String          @db.VarChar(255)
   email          String          @unique @db.VarChar(255)
   password       String          @db.VarChar(255)
-  settings       Json            @default("{}") @db.Json
+  isActive       Boolean         @default(false) @db.Boolean
+  settings       Json            @default("{\"background\": \"default\"}") @db.Json
   createdAt      DateTime        @default(now()) @db.Timestamp(3)
   updatedAt      DateTime        @updatedAt @db.Timestamp(3)
   projectsOwned  Project[]
   projectsJoined ProjectMember[]
+  token          Token?
+  membership     Membership?     @relation("CurrentMembership") // Effectively mandatory - enforced by DB triggers
+  nextMembership NextMembership? @relation("ScheduledMembership")
+}
+
+model Membership {
+  id        String           @id @default(uuid())
+  userId    String           @unique
+  status    MembershipStatus @default(FREE)
+  startedAt DateTime         @default(now()) @db.Timestamp(3)
+  endsAt    DateTime?
+  user      User             @relation("CurrentMembership", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NextMembership {
+  id        String           @id @default(uuid())
+  userId    String           @unique
+  status    MembershipStatus @default(FREE)
+  startsAt  DateTime // When this membership should become active
+  endsAt    DateTime? // When this membership expires (null for permanent)
+  createdAt DateTime         @default(now()) @db.Timestamp(3)
+  user      User             @relation("ScheduledMembership", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Token {
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())
+  expiresAt DateTime @default(dbgenerated("(NOW() AT TIME ZONE 'UTC') + INTERVAL '5 minutes'"))
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
   id          String          @id @default(uuid())
-  owner       User            @relation(fields: [ownerId], references: [id])
-  ownerId     String          @unique
   name        String          @db.VarChar(255)
-  description String?
   createdAt   DateTime        @default(now()) @db.Timestamp(3)
   updatedAt   DateTime        @updatedAt @db.Timestamp(3)
-  projectType ProjectType     @default(KANBAN)
+  owner       User            @relation(fields: [ownerId], references: [id])
+  ownerId     String          @unique
+  description String?         @default("") @db.Text
+  projectType ProjectType     @default(KANBAN) // We are only using Kanban for the foreseeable future. No other types implemented yet.
   members     ProjectMember[]
-  tickets     Ticket[]
   features    Feature[]
 }
 
 model Feature {
   id          Int      @id @default(autoincrement())
-  title       String   @db.VarChar(255)
-  description String?
+  title       String   @default("BASE") @db.VarChar(255)
+  description String?  @default("") @db.Text
   createdAt   DateTime @default(now()) @db.Timestamp(3)
   projectId   String   @unique
   project     Project  @relation(fields: [projectId], references: [id])
@@ -50,20 +81,18 @@ model Feature {
 }
 
 model Ticket {
-  id              String          @id @default(uuid())
-  title           String          @db.VarChar(255)
-  description     String?
-  createdAt       DateTime        @default(now()) @db.Timestamp(3)
-  updatedAt       DateTime        @updatedAt @db.Timestamp(3)
-  section         Section         @default(ACTIVE)
-  status          Status          @default(UNASSIGNED)
-  priority        Priority        @default(LOW)
-  timeEstimateMin Int?
-  Project         Project         @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  projectId       String
-  feature         Feature?        @relation(fields: [featureId], references: [id])
-  featureId       Int?            @unique
-  assignees       ProjectMember[]
+  id          String          @id @default(uuid())
+  title       String          @db.VarChar(255)
+  description String?         @default("") @db.Text
+  createdAt   DateTime        @default(now()) @db.Timestamp(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamp(3)
+  section     Section         @default(ACTIVE)
+  status      Status          @default(UNASSIGNED)
+  priority    Priority        @default(NONE)
+  timeLog     Int?            @default(0) // Time logged in minutes
+  feature     Feature?        @relation(fields: [featureId], references: [id])
+  featureId   Int?            @unique
+  assignees   ProjectMember[]
 }
 
 // Extends a User for a project
@@ -76,6 +105,13 @@ model ProjectMember {
   projectId    String
   tickets      Ticket[]
   User         User         @relation(fields: [userId], references: [id])
+}
+
+enum MembershipStatus {
+  FREE
+  STARTUP
+  TEAM
+  ENTERPRISE
 }
 
 enum Section {
@@ -106,16 +142,27 @@ enum Role {
 }
 
 enum Permissions {
-  EDIT_PROJECT
-  EDIT_MEMBERS
-  ADD_TICKET
+  UPDATE_PROJECT
+  ADD_MEMBERS
+  UPDATE_MEMBERS
+  REMOVE_MEMBERS
+  CREATE_FEATURE
+  UPDATE_FEATURE
+  DELETE_FEATURE
+  CREATE_TICKET
+  UPDATE_TICKET
   DELETE_TICKET
-  MOVE_TICKET
   ASSIGN_TICKET_SELF
+  ASSIGN_TICKET_ALL
   UNASSIGN_TICKET_SELF
+  UNASSIGN_TICKET_ALL
+  MOVE_TICKET_SECTION
+  CHANGE_TICKET_STATUS
+  CHANGE_TICKET_PRIORITY
 }
 
 enum Priority {
+  NONE
   LOW
   MODERATE
   HIGH
