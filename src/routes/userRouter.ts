@@ -16,7 +16,7 @@ import {
   userSignUp,
   verifyAndUpdateMembership,
 } from "../controllers/user/userController";
-import { authenticateUser } from "../middleware/auth";
+import { authenticateUser } from "../middleware/authenticateUser";
 const userRouter = express.Router();
 
 userRouter.get("/", authenticateUser, getAuthenticatedUser);

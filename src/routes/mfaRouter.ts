@@ -1,6 +1,6 @@
 import express from "express";
 import { mfaEmailToken, sendMfaToken } from "../controllers/mfa/mfaController";
-import { authenticateUser } from "../middleware/auth";
+import { authenticateUser } from "../middleware/authenticateUser";
 const mfaRouter = express.Router();
 
 mfaRouter.post("/email-token", authenticateUser, mfaEmailToken);

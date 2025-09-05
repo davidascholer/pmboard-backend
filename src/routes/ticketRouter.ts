@@ -5,9 +5,11 @@ import {
   readTicket,
   updateTicket,
 } from "../controllers/ticket/ticketController";
+import { authenticateUser } from "../middleware/authenticateUser";
+import validateProjectMember from "../middleware/validateProjectMember";
 const ticketRouter = express.Router();
 
-ticketRouter.get("/:id", readTicket);
+ticketRouter.get("/:project_id", authenticateUser, validateProjectMember, readTicket);
 ticketRouter.post("/", createTicket);
 ticketRouter.patch("/", updateTicket);
 ticketRouter.delete("/", deleteTicket);

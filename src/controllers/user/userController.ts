@@ -4,7 +4,7 @@ import prisma from "../../prismaClient";
 import { User } from "@prisma/client";
 import { hash, compare } from "bcrypt";
 import { generateJWT } from "../auth/util";
-import { AuthenticatedRequest } from "../../middleware/auth";
+import { AuthenticatedRequest } from "../../middleware/authenticateUser";
 
 export const getAuthenticatedUser = async (req: Request, res: Response) => {
   try {

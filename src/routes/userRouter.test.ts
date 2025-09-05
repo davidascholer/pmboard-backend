@@ -1,7 +1,7 @@
 import request from "supertest";
 import express from "express";
 import userRouter from "./userRouter";
-import { authenticateUser } from "../middleware/auth";
+import { authenticateUser } from "../middleware/authenticateUser";
 import * as userController from "../controllers/user/userController";
 
 // Mock the middleware

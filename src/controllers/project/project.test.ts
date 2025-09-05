@@ -1,11 +1,10 @@
 import request from "supertest";
 import express from "express";
-import projectRouter from "./projectRouter";
-import { authenticateUser } from "../middleware/auth";
-import * as projectController from "../controllers/project/projectController";
-import validateProjectOwnerOrAdmin from "../middleware/validateProjectOwnerOrAdmin";
-import validateProjectOwnerOrMember from "../middleware/validateProjectOwnerOrMember";
-import validateProjectOwner from "../middleware/validateProjectOwner";
+import projectRouter from "../../routes/projectRouter";
+import * as projectController from "./projectController";
+import validateProjectOwnerOrAdmin from "../../middleware/validateProjectOwnerOrAdmin";
+import validateProjectOwnerOrMember from "../../middleware/validateProjectOwnerOrMember";
+import validateProjectOwner from "../../middleware/validateProjectOwner";
 
 // Mock the auth middleware
 jest.mock("../middleware/auth", () => ({

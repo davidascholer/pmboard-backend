@@ -1,7 +1,7 @@
 // Validate that the user is the owner of the project they are trying to access
 import { Request, Response, NextFunction } from "express";
 import prisma from "../prismaClient";
-import { AuthenticatedRequest } from "./auth";
+import { AuthenticatedRequest } from "./authenticateUser";
 
 const validateProjectOwnerOrAdmin = async (
   req: Request,
@@ -16,7 +16,7 @@ const validateProjectOwnerOrAdmin = async (
     });
   }
 
-  const projectId = req.params.id;
+  const projectId = req.params.project_id;
   const userId = authReq.user.id;
 
   if (!projectId || !userId) {

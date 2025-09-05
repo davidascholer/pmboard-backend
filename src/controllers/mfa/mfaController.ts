@@ -1,7 +1,7 @@
 import { User } from "@prisma/client";
 import prisma from "../../prismaClient";
 import { Request, Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth";
+import { AuthenticatedRequest } from "../../middleware/authenticateUser";
 import nodemailer from "nodemailer";
 
 /**
