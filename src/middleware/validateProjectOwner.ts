@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import prisma from "../prismaClient";
 import { AuthenticatedRequest } from "./auth";
 
-const validateProjectOwnerOrAdmin = async (
+const validateProjectOwner = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -28,7 +28,7 @@ const validateProjectOwnerOrAdmin = async (
   try {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { ownerId: true, members: true },
+      select: { ownerId: true },
     });
 
     if (!project) {
@@ -38,12 +38,8 @@ const validateProjectOwnerOrAdmin = async (
     }
 
     const isOwner = project.ownerId === userId;
-    // Check if the user is a member with ADMIN role
-    const isAdminMember = project.members.some(
-      (member) => member.userId === userId && member.role === "ADMIN"
-    );
 
-    if (!isAdminMember && !isOwner) {
+    if (!isOwner) {
       return res.status(403).json({
         message: "Invalid permissions.",
       });
@@ -58,4 +54,4 @@ const validateProjectOwnerOrAdmin = async (
   }
 };
 
-export default validateProjectOwnerOrAdmin;
+export default validateProjectOwner;

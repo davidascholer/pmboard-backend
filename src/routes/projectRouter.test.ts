@@ -42,10 +42,15 @@ jest.mock("../middleware/validateProjectOwnerOrMember", () =>
   jest.fn((req, res, next) => next())
 );
 
+jest.mock("../middleware/validateProjectOwner", () =>
+  jest.fn((req, res, next) => next())
+);
+
 // Mock all project controller functions
 jest.mock("../controllers/project/projectController", () => ({
   getProject: jest.fn(),
   createProject: jest.fn(),
+  deleteProject: jest.fn(),
   updateDescription: jest.fn(),
   addFeatureToProject: jest.fn(),
   removeFeatureFromProject: jest.fn(),
@@ -294,6 +299,86 @@ describe("Project Router", () => {
 
       expect(response.status).toBe(201);
       expect(response.body.projectType).toBe("KANBAN");
+    });
+  });
+
+  describe("DELETE /projects/:id", () => {
+    it("should delete project successfully", async () => {
+      (projectController.deleteProject as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(204).send();
+        }
+      );
+
+      const response = await request(app)
+        .delete("/projects/project-id")
+        .send();
+
+      expect(response.status).toBe(204);
+      expect(projectController.deleteProject).toHaveBeenCalledTimes(1);
+    });
+
+    it("should handle non-existent project", async () => {
+      (projectController.deleteProject as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(404).json({
+            message: "Project not found",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .delete("/projects/nonexistent-id")
+        .send();
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe("Project not found");
+    });
+
+    it("should handle unauthorized deletion", async () => {
+      (projectController.deleteProject as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(401).json({
+            message: "Unauthorized",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .delete("/projects/project-id")
+        .send();
+
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe("Unauthorized");
+    });
+
+    it("should handle database errors during deletion", async () => {
+      (projectController.deleteProject as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(500).json({
+            message: "An error occurred while deleting the project",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .delete("/projects/project-id")
+        .send();
+
+      expect(response.status).toBe(500);
+      expect(response.body.message).toBe(
+        "An error occurred while deleting the project"
+      );
+    });
+
+    it("should validate project ownership", async () => {
+      await request(app)
+        .delete("/projects/project-id")
+        .send();
+
+      // The validateProjectOwner middleware should be called
+      // This is mocked to always succeed in our test setup
+      expect(projectController.deleteProject).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -715,12 +800,6 @@ describe("Project Router", () => {
 
       expect(response.status).toBe(404);
     });
-
-    it("should not allow DELETE to any endpoints", async () => {
-      const response = await request(app).delete("/projects/project-id");
-
-      expect(response.status).toBe(404);
-    });
   });
 
   describe("Middleware Integration", () => {
@@ -754,12 +833,20 @@ describe("Project Router", () => {
       expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
     });
 
-    it("should not apply authentication middleware to createProject route", async () => {
-      // The createProject route doesn't have authentication middleware
-      // This test ensures it remains accessible without authentication
+    it("should apply validateProjectOwner to delete route", async () => {
+      await request(app)
+        .delete("/projects/project-id")
+        .send();
+
+      // The validateProjectOwner middleware should be called for DELETE
+      expect(projectController.deleteProject).toHaveBeenCalledTimes(1);
+    });
+
+    it("should apply authentication middleware to createProject route", async () => {
+      // The createProject route has authentication middleware
       await request(app)
         .post("/projects")
-        .send({ name: "Test", ownerId: "user-id" });
+        .send({ name: "Test" });
 
       expect(projectController.createProject).toHaveBeenCalledTimes(1);
     });

@@ -1,7 +1,8 @@
-import { Request, Response } from "express";
+import e, { Request, Response } from "express";
 import prisma from "../../prismaClient";
 import { Project } from "@prisma/client";
 import { projectReturnSelect } from "../../lib/returnSignatures";
+import { AuthenticatedRequest } from "../../middleware/auth";
 
 export const getProject = async (req: Request, res: Response) => {
   const id: string = req.params.id;
@@ -35,10 +36,18 @@ export const getProject = async (req: Request, res: Response) => {
 };
 
 export const createProject = async (req: Request, res: Response) => {
+  // Validated the request user
+  const authReq = req as AuthenticatedRequest;
+  if (!authReq.user) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+
   // Validate request body
-  if (!req.body || !req.body.name || !req.body.ownerId) {
+  if (!req.body || !req.body.name) {
     return res.status(400).json({
-      message: "The fields name and ownerId are required.",
+      message: "The name field is required.",
     });
   }
 
@@ -49,31 +58,13 @@ export const createProject = async (req: Request, res: Response) => {
     });
   }
 
-  // Validate ownerId
-  if (typeof req.body.ownerId !== "string" || req.body.ownerId.trim() === "") {
-    return res.status(400).json({
-      message: "Invalid ownerId. It must be a non-empty string.",
-    });
-  }
-
-  // Validate owner
-  const owner = await prisma.user.findUnique({
-    where: { id: req.body.ownerId },
-    select: { id: true },
-  });
-  if (!owner) {
-    return res.status(404).json({
-      message: "Owner not found.",
-    });
-  }
-
   const creationData: {
     ownerId: Project["ownerId"];
     name: Project["name"];
     description?: Project["description"];
     projectType?: Project["projectType"];
   } = {
-    ownerId: req.body.ownerId,
+    ownerId: authReq.user.id,
     name: req.body.name,
   };
 
@@ -131,8 +122,82 @@ export const createProject = async (req: Request, res: Response) => {
   }
 };
 
+export const deleteProject = async (req: Request, res: Response) => {
+  const id: string = req.params.id;
+
+  // Validated the request user
+  const authReq = req as AuthenticatedRequest;
+  if (!authReq.user) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+
+  try {
+    // Check if the project exists
+    const existingProject = await prisma.project.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existingProject) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    // Use a transaction to delete all related records and the project
+    await prisma.$transaction(async (tx) => {
+      // 1. First, get all features for this project
+      const features = await tx.feature.findMany({
+        where: { projectId: id },
+        select: { id: true },
+      });
+
+      // 2. Delete all tickets associated with these features
+      if (features.length > 0) {
+        const featureIds = features.map((feature) => feature.id);
+        await tx.ticket.deleteMany({
+          where: { featureId: { in: featureIds } },
+        });
+      }
+
+      // 3. Delete all features for this project
+      await tx.feature.deleteMany({
+        where: { projectId: id },
+      });
+
+      // 4. Delete all project members
+      await tx.projectMember.deleteMany({
+        where: { projectId: id },
+      });
+
+      // 5. Finally, delete the project itself
+      await tx.project.delete({
+        where: { id },
+      });
+    });
+
+    // Successfully return a no content response
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting project:", error);
+    res.status(500).json({
+      message: "An error occurred while deleting the project",
+    });
+  }
+};
+
 export const updateDescription = async (req: Request, res: Response) => {
   const id: string = req.params.id;
+
+  // Validated the request user
+  const authReq = req as AuthenticatedRequest;
+  if (!authReq.user) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
 
   // Validate request body
   if (!req.body || typeof req.body.description !== "string") {
@@ -280,7 +345,7 @@ export const removeFeatureFromProject = async (req: Request, res: Response) => {
     // Check if the feature exists and is associated with the project
     const existingFeature = await prisma.feature.findFirst({
       where: { id: featureId, projectId },
-      select: { id: true },
+      select: { id: true, title: true },
     });
 
     if (!existingFeature) {
@@ -290,7 +355,7 @@ export const removeFeatureFromProject = async (req: Request, res: Response) => {
     }
 
     // Validate title is not BASE
-    if (req.body.title.trim().toUpperCase() === "BASE") {
+    if (existingFeature.title.trim().toUpperCase() === "BASE") {
       return res.status(400).json({
         message: "The base feature may not be deleted.",
       });
