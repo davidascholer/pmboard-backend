@@ -5,7 +5,7 @@ import { projectReturnSelect } from "../../lib/returnSignatures";
 import { AuthenticatedRequest } from "../../middleware/authenticateUser";
 
 export const getProject = async (req: Request, res: Response) => {
-  const id: string = req.params.project_id;
+  const id: string = req.params.id;
   try {
     const post = await prisma.project
       .findUnique({
@@ -146,7 +146,7 @@ export const createProject = async (req: Request, res: Response) => {
 };
 
 export const deleteProject = async (req: Request, res: Response) => {
-  const id: string = req.params.project_id;
+  const id: string = req.params.id;
 
   // Validated the request user
   const authReq = req as AuthenticatedRequest;
@@ -220,7 +220,7 @@ export const deleteProject = async (req: Request, res: Response) => {
 };
 
 export const updateStatus = async (req: Request, res: Response) => {
-  const id: string = req.params.project_id;
+  const id: string = req.params.id;
 
   // Validated the request user
   const authReq = req as AuthenticatedRequest;
@@ -273,7 +273,7 @@ export const updateStatus = async (req: Request, res: Response) => {
 };
 
 export const updateDescription = async (req: Request, res: Response) => {
-  const id: string = req.params.project_id;
+  const id: string = req.params.id;
 
   // Validated the request user
   const authReq = req as AuthenticatedRequest;

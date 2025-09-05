@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../../prismaClient";
 
 export const addFeatureToProject = async (req: Request, res: Response) => {
-  const projectId: string = req.params.project_id;
+  const projectId: string = req.params.id;
 
   // Validate title
   if (
@@ -88,8 +88,8 @@ export const addFeatureToProject = async (req: Request, res: Response) => {
 };
 
 export const removeFeatureFromProject = async (req: Request, res: Response) => {
-  const projectId: string = req.params.project_id;
-  const featureId: number = parseInt(req.params.id, 10);
+  const projectId: string = req.params.id;
+  const featureId: number = parseInt(req.params.featureId, 10);
 
   if (isNaN(featureId)) {
     return res.status(400).json({

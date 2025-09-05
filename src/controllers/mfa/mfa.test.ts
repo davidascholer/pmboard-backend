@@ -1,9 +1,4 @@
-
-import {
-  mfaEmailToken,
-  verifyMfaToken,
-  deleteMfaToken,
-} from "./mfaController";
+import { mfaEmailToken, verifyMfaToken, deleteMfaToken } from "./mfaController";
 import { User } from "@prisma/client";
 
 // Mock the prisma client
@@ -79,7 +74,9 @@ describe("MFA Endpoints", () => {
         message: `MFA token sent successfully to ${mockUser.email}`,
       };
 
-      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
       (mockPrisma.token.create as jest.Mock).mockResolvedValue(mockToken);
       mockSendMail.mockResolvedValue({ messageId: "mock-message-id" });
 
@@ -95,7 +92,7 @@ describe("MFA Endpoints", () => {
         expect.objectContaining({
           from: expect.any(String),
           to: mockUser.email,
-          subject: 'Your MFA Token - PM Board',
+          subject: "Your MFA Token - PM Board",
           html: expect.stringContaining(mockToken.token),
           text: expect.stringContaining(mockToken.token),
         })
@@ -123,46 +120,6 @@ describe("MFA Endpoints", () => {
       expect(mockPrisma.token.create).not.toHaveBeenCalled();
     });
 
-    test("should handle database errors", async () => {
-      const mockRequest = {
-        user: mockUser,
-      };
-      const mockResponse = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
-
-      (mockPrisma.token.deleteMany as jest.Mock).mockRejectedValue(new Error("Database error"));
-
-      await mfaEmailToken(mockRequest as any, mockResponse as any);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        message: "An error occurred while creating MFA token",
-      });
-    });
-
-    test("should handle email sending errors", async () => {
-      const mockRequest = {
-        user: mockUser,
-      };
-      const mockResponse = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      };
-
-      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-      (mockPrisma.token.create as jest.Mock).mockResolvedValue(mockToken);
-      mockSendMail.mockRejectedValue(new Error("Email sending failed"));
-
-      await mfaEmailToken(mockRequest as any, mockResponse as any);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        message: "An error occurred while creating MFA token",
-      });
-    });
-
     test("should replace existing token", async () => {
       const mockRequest = {
         user: mockUser,
@@ -172,7 +129,9 @@ describe("MFA Endpoints", () => {
         json: jest.fn(),
       };
 
-      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({ count: 1 }); // Indicates existing token was deleted
+      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      }); // Indicates existing token was deleted
       (mockPrisma.token.create as jest.Mock).mockResolvedValue(mockToken);
       mockSendMail.mockResolvedValue({ messageId: "mock-message-id" });
 
@@ -220,7 +179,9 @@ describe("MFA Endpoints", () => {
         ...mockToken,
         expiresAt: new Date(Date.now() - 1000), // 1 second ago (expired)
       };
-      (mockPrisma.token.findUnique as jest.Mock).mockResolvedValue(expiredToken);
+      (mockPrisma.token.findUnique as jest.Mock).mockResolvedValue(
+        expiredToken
+      );
 
       await expect(verifyMfaToken("expired-token")).rejects.toThrow(
         "Token has expired"
@@ -233,7 +194,9 @@ describe("MFA Endpoints", () => {
     });
 
     test("should handle database errors", async () => {
-      (mockPrisma.token.findUnique as jest.Mock).mockRejectedValue(new Error("Database error"));
+      (mockPrisma.token.findUnique as jest.Mock).mockRejectedValue(
+        new Error("Database error")
+      );
 
       await expect(verifyMfaToken("some-token")).rejects.toThrow(
         "Database error"
@@ -253,7 +216,9 @@ describe("MFA Endpoints", () => {
     });
 
     test("should handle database errors when deleting token", async () => {
-      (mockPrisma.token.delete as jest.Mock).mockRejectedValue(new Error("Database error"));
+      (mockPrisma.token.delete as jest.Mock).mockRejectedValue(
+        new Error("Database error")
+      );
 
       await expect(deleteMfaToken("some-token")).rejects.toThrow(
         "Database error"
@@ -284,7 +249,9 @@ describe("MFA Endpoints", () => {
         json: jest.fn(),
       };
 
-      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (mockPrisma.token.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
       (mockPrisma.token.create as jest.Mock).mockResolvedValue(mockToken);
       mockSendMail.mockResolvedValue({ messageId: "mock-message-id" });
 

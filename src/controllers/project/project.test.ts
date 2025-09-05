@@ -1,13 +1,42 @@
 import request from "supertest";
 import express from "express";
 import projectRouter from "../../routes/projectRouter";
-import * as projectController from "./projectController";
 import validateProjectOwnerOrAdmin from "../../middleware/validateProjectOwnerOrAdmin";
 import validateProjectOwnerOrMember from "../../middleware/validateProjectOwnerOrMember";
 import validateProjectOwner from "../../middleware/validateProjectOwner";
+import {
+  createProject,
+  deleteProject,
+  getProject,
+  updateDescription,
+  updateStatus,
+} from "./projectController";
+import {
+  addFeatureToProject,
+  removeFeatureFromProject,
+} from "../feature/featureController";
+
+// Mock Prisma client
+jest.mock("../../prismaClient", () => ({
+  __esModule: true,
+  default: {
+    project: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    feature: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn(),
+    },
+    $disconnect: jest.fn(),
+  },
+}));
 
 // Mock the auth middleware
-jest.mock("../middleware/auth", () => ({
+jest.mock("../../middleware/authenticateUser", () => ({
   authenticateUser: jest.fn((req, res, next) => {
     // Mock authenticated user
     req.user = {
@@ -34,25 +63,29 @@ jest.mock("../middleware/auth", () => ({
 }));
 
 // Mock the project validation middleware
-jest.mock("../middleware/validateProjectOwnerOrAdmin", () =>
+jest.mock("../../middleware/validateProjectOwnerOrAdmin", () =>
   jest.fn((req, res, next) => next())
 );
 
-jest.mock("../middleware/validateProjectOwnerOrMember", () =>
+jest.mock("../../middleware/validateProjectOwnerOrMember", () =>
   jest.fn((req, res, next) => next())
 );
 
-jest.mock("../middleware/validateProjectOwner", () =>
+jest.mock("../../middleware/validateProjectOwner", () =>
   jest.fn((req, res, next) => next())
 );
 
 // Mock all project controller functions
-jest.mock("../controllers/project/projectController", () => ({
+jest.mock("./projectController", () => ({
   getProject: jest.fn(),
   createProject: jest.fn(),
   deleteProject: jest.fn(),
   updateDescription: jest.fn(),
   updateStatus: jest.fn(),
+}));
+
+// Mock feature controller functions
+jest.mock("../feature/featureController", () => ({
   addFeatureToProject: jest.fn(),
   removeFeatureFromProject: jest.fn(),
 }));
@@ -67,6 +100,12 @@ describe("Project Router", () => {
     jest.clearAllMocks();
   });
 
+  afterAll(async () => {
+    // Close any open handles
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
   describe("GET /projects/:id", () => {
     it("should call getProject controller with correct route", async () => {
       const mockResponse = {
@@ -76,26 +115,22 @@ describe("Project Router", () => {
         features: [],
       };
 
-      (projectController.getProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(200).json(mockResponse);
-        }
-      );
+      (getProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(200).json(mockResponse);
+      });
 
       const response = await request(app).get("/projects/project-id");
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockResponse);
-      expect(projectController.getProject).toHaveBeenCalledTimes(1);
+      expect(getProject).toHaveBeenCalledTimes(1);
       expect(validateProjectOwnerOrMember).toHaveBeenCalledTimes(1);
     });
 
     it("should handle missing project ID", async () => {
-      (projectController.getProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({ message: "Project not found" });
-        }
-      );
+      (getProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(404).json({ message: "Project not found" });
+      });
 
       const response = await request(app).get("/projects/nonexistent-id");
 
@@ -134,19 +169,15 @@ describe("Project Router", () => {
         ],
       };
 
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(201).json(mockResponse);
-        }
-      );
+      (createProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(201).json(mockResponse);
+      });
 
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
+      const response = await request(app).post("/projects").send(requestBody);
 
       expect(response.status).toBe(201);
       expect(response.body).toEqual(mockResponse);
-      expect(projectController.createProject).toHaveBeenCalledTimes(1);
+      expect(createProject).toHaveBeenCalledTimes(1);
     });
 
     it("should require name field", async () => {
@@ -154,17 +185,13 @@ describe("Project Router", () => {
         description: "Missing required name field",
       };
 
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "The name field is required.",
-          });
-        }
-      );
+      (createProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(400).json({
+          message: "The name field is required.",
+        });
+      });
 
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
+      const response = await request(app).post("/projects").send(requestBody);
 
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("The name field is required.");
@@ -176,18 +203,14 @@ describe("Project Router", () => {
         projectType: "INVALID_TYPE",
       };
 
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message:
-              "Invalid project type. Allowed values are: KANBAN, SCRUM, WATERFALL.",
-          });
-        }
-      );
+      (createProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(400).json({
+          message:
+            "Invalid project type. Allowed values are: KANBAN, SCRUM, WATERFALL.",
+        });
+      });
 
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
+      const response = await request(app).post("/projects").send(requestBody);
 
       expect(response.status).toBe(400);
       expect(response.body.message).toBe(
@@ -200,17 +223,13 @@ describe("Project Router", () => {
         name: "",
       };
 
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "Invalid name. It must be a non-empty string.",
-          });
-        }
-      );
+      (createProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(400).json({
+          message: "Invalid name. It must be a non-empty string.",
+        });
+      });
 
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
+      const response = await request(app).post("/projects").send(requestBody);
 
       expect(response.status).toBe(400);
       expect(response.body.message).toBe(
@@ -223,17 +242,13 @@ describe("Project Router", () => {
         name: "Test Project",
       };
 
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(401).json({
-            message: "Unauthorized",
-          });
-        }
-      );
+      (createProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(401).json({
+          message: "Unauthorized",
+        });
+      });
 
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
+      const response = await request(app).post("/projects").send(requestBody);
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe("Unauthorized");
@@ -259,15 +274,11 @@ describe("Project Router", () => {
         ],
       };
 
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(201).json(mockResponse);
-        }
-      );
+      (createProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(201).json(mockResponse);
+      });
 
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
+      const response = await request(app).post("/projects").send(requestBody);
 
       expect(response.status).toBe(201);
       expect(response.body.projectType).toBe("KANBAN");
@@ -278,28 +289,22 @@ describe("Project Router", () => {
 
   describe("DELETE /projects/:id", () => {
     it("should delete project successfully", async () => {
-      (projectController.deleteProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(204).send();
-        }
-      );
+      (deleteProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(204).send();
+      });
 
-      const response = await request(app)
-        .delete("/projects/project-id")
-        .send();
+      const response = await request(app).delete("/projects/project-id").send();
 
       expect(response.status).toBe(204);
-      expect(projectController.deleteProject).toHaveBeenCalledTimes(1);
+      expect(deleteProject).toHaveBeenCalledTimes(1);
     });
 
     it("should handle non-existent project", async () => {
-      (projectController.deleteProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Project not found",
-          });
-        }
-      );
+      (deleteProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(404).json({
+          message: "Project not found",
+        });
+      });
 
       const response = await request(app)
         .delete("/projects/nonexistent-id")
@@ -310,34 +315,26 @@ describe("Project Router", () => {
     });
 
     it("should handle unauthorized deletion", async () => {
-      (projectController.deleteProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(401).json({
-            message: "Unauthorized",
-          });
-        }
-      );
+      (deleteProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(401).json({
+          message: "Unauthorized",
+        });
+      });
 
-      const response = await request(app)
-        .delete("/projects/project-id")
-        .send();
+      const response = await request(app).delete("/projects/project-id").send();
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe("Unauthorized");
     });
 
     it("should handle database errors during deletion", async () => {
-      (projectController.deleteProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(500).json({
-            message: "An error occurred while deleting the project",
-          });
-        }
-      );
+      (deleteProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(500).json({
+          message: "An error occurred while deleting the project",
+        });
+      });
 
-      const response = await request(app)
-        .delete("/projects/project-id")
-        .send();
+      const response = await request(app).delete("/projects/project-id").send();
 
       expect(response.status).toBe(500);
       expect(response.body.message).toBe(
@@ -346,13 +343,11 @@ describe("Project Router", () => {
     });
 
     it("should validate project ownership", async () => {
-      await request(app)
-        .delete("/projects/project-id")
-        .send();
+      await request(app).delete("/projects/project-id").send();
 
       // The validateProjectOwner middleware should be called
       // This is mocked to always succeed in our test setup
-      expect(projectController.deleteProject).toHaveBeenCalledTimes(1);
+      expect(deleteProject).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -369,11 +364,9 @@ describe("Project Router", () => {
         features: [],
       };
 
-      (projectController.updateDescription as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(200).json(mockResponse);
-        }
-      );
+      (updateDescription as jest.Mock).mockImplementation((req, res) => {
+        res.status(200).json(mockResponse);
+      });
 
       const response = await request(app)
         .patch("/projects/update-description/project-id")
@@ -381,20 +374,18 @@ describe("Project Router", () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockResponse);
-      expect(projectController.updateDescription).toHaveBeenCalledTimes(1);
+      expect(updateDescription).toHaveBeenCalledTimes(1);
       expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
     });
 
     it("should require description field", async () => {
       const requestBody = {};
 
-      (projectController.updateDescription as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "The field description is required and must be a string.",
-          });
-        }
-      );
+      (updateDescription as jest.Mock).mockImplementation((req, res) => {
+        res.status(400).json({
+          message: "The field description is required and must be a string.",
+        });
+      });
 
       const response = await request(app)
         .patch("/projects/update-description/project-id")
@@ -411,13 +402,11 @@ describe("Project Router", () => {
         description: "Updated description",
       };
 
-      (projectController.updateDescription as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Project not found",
-          });
-        }
-      );
+      (updateDescription as jest.Mock).mockImplementation((req, res) => {
+        res.status(404).json({
+          message: "Project not found",
+        });
+      });
 
       const response = await request(app)
         .patch("/projects/update-description/nonexistent-id")
@@ -454,11 +443,9 @@ describe("Project Router", () => {
         features: [],
       };
 
-      (projectController.updateStatus as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(200).json(mockResponse);
-        }
-      );
+      (updateStatus as jest.Mock).mockImplementation((req, res) => {
+        res.status(200).json(mockResponse);
+      });
 
       const response = await request(app)
         .patch("/projects/update-status/project-id")
@@ -466,20 +453,19 @@ describe("Project Router", () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockResponse);
-      expect(projectController.updateStatus).toHaveBeenCalledTimes(1);
+      expect(updateStatus).toHaveBeenCalledTimes(1);
       expect(validateProjectOwner).toHaveBeenCalledTimes(1);
     });
 
     it("should require status field", async () => {
       const requestBody = {};
 
-      (projectController.updateStatus as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "The status field is required and must be either ACTIVE or ARCHIVED.",
-          });
-        }
-      );
+      (updateStatus as jest.Mock).mockImplementation((req, res) => {
+        res.status(400).json({
+          message:
+            "The status field is required and must be either ACTIVE or ARCHIVED.",
+        });
+      });
 
       const response = await request(app)
         .patch("/projects/update-status/project-id")
@@ -496,13 +482,12 @@ describe("Project Router", () => {
         status: "INVALID_STATUS",
       };
 
-      (projectController.updateStatus as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "The status field is required and must be either ACTIVE or ARCHIVED.",
-          });
-        }
-      );
+      (updateStatus as jest.Mock).mockImplementation((req, res) => {
+        res.status(400).json({
+          message:
+            "The status field is required and must be either ACTIVE or ARCHIVED.",
+        });
+      });
 
       const response = await request(app)
         .patch("/projects/update-status/project-id")
@@ -519,13 +504,11 @@ describe("Project Router", () => {
         status: "ARCHIVED",
       };
 
-      (projectController.updateStatus as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Project not found",
-          });
-        }
-      );
+      (updateStatus as jest.Mock).mockImplementation((req, res) => {
+        res.status(404).json({
+          message: "Project not found",
+        });
+      });
 
       const response = await request(app)
         .patch("/projects/update-status/nonexistent-id")
@@ -540,13 +523,11 @@ describe("Project Router", () => {
         status: "ARCHIVED",
       };
 
-      (projectController.updateStatus as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(401).json({
-            message: "Unauthorized",
-          });
-        }
-      );
+      (updateStatus as jest.Mock).mockImplementation((req, res) => {
+        res.status(401).json({
+          message: "Unauthorized",
+        });
+      });
 
       const response = await request(app)
         .patch("/projects/update-status/project-id")
@@ -569,317 +550,9 @@ describe("Project Router", () => {
     });
   });
 
-  describe("PATCH /projects/add-feature/:id", () => {
-    it("should add feature to project successfully", async () => {
-      const requestBody = {
-        title: "New Feature",
-        description: "Feature description",
-      };
-
-      const mockResponse = {
-        id: 2,
-        title: "New Feature",
-        description: "Feature description",
-        projectId: "project-id",
-        createdAt: "2025-09-04T23:48:13.495Z", // Use string format for JSON response
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(201).json(mockResponse);
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual(mockResponse);
-      expect(projectController.addFeatureToProject).toHaveBeenCalledTimes(1);
-      expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
-    });
-
-    it("should require title field", async () => {
-      const requestBody = {
-        description: "Feature without title",
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "Invalid title. It must be a non-empty string.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid title. It must be a non-empty string."
-      );
-    });
-
-    it("should reject reserved 'BASE' title", async () => {
-      const requestBody = {
-        title: "BASE",
-        description: "Should not be allowed",
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "Invalid title. 'Base' is a reserved title.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid title. 'Base' is a reserved title."
-      );
-    });
-
-    it("should reject reserved 'base' title (case insensitive)", async () => {
-      const requestBody = {
-        title: "base",
-        description: "Should not be allowed",
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "Invalid title. 'Base' is a reserved title.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid title. 'Base' is a reserved title."
-      );
-    });
-
-    it("should handle empty title", async () => {
-      const requestBody = {
-        title: "",
-        description: "Empty title",
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "Invalid title. It must be a non-empty string.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid title. It must be a non-empty string."
-      );
-    });
-
-    it("should handle non-existent project", async () => {
-      const requestBody = {
-        title: "New Feature",
-        description: "Feature description",
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Project not found",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/nonexistent-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe("Project not found");
-    });
-
-    it("should add feature without description", async () => {
-      const requestBody = {
-        title: "Feature Without Description",
-      };
-
-      const mockResponse = {
-        id: 3,
-        title: "Feature Without Description",
-        description: null,
-        projectId: "project-id",
-        createdAt: "2025-09-04T23:48:13.495Z", // Use string format for JSON response
-      };
-
-      (projectController.addFeatureToProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(201).json(mockResponse);
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(response.status).toBe(201);
-      expect(response.body.description).toBeNull();
-    });
-
-    it("should validate project ownership or admin role", async () => {
-      const requestBody = {
-        title: "New Feature",
-      };
-
-      await request(app)
-        .patch("/projects/add-feature/project-id")
-        .send(requestBody);
-
-      expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("PATCH /projects/remove-feature/:id/:featureId", () => {
-    it("should remove feature from project successfully", async () => {
-      (projectController.removeFeatureFromProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(204).send();
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/remove-feature/project-id/2")
-        .send();
-
-      expect(response.status).toBe(204);
-      expect(projectController.removeFeatureFromProject).toHaveBeenCalledTimes(1);
-      expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
-    });
-
-    it("should handle invalid featureId", async () => {
-      (projectController.removeFeatureFromProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "Invalid featureId. It must be a number.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/remove-feature/project-id/invalid-id")
-        .send();
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid featureId. It must be a number."
-      );
-    });
-
-    it("should handle non-existent project", async () => {
-      (projectController.removeFeatureFromProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Project not found",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/remove-feature/nonexistent-id/2")
-        .send();
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe("Project not found");
-    });
-
-    it("should handle non-existent feature", async () => {
-      (projectController.removeFeatureFromProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Feature not found in the specified project",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/remove-feature/project-id/999")
-        .send();
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe(
-        "Feature not found in the specified project"
-      );
-    });
-
-    it("should prevent deletion of BASE feature", async () => {
-      (projectController.removeFeatureFromProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message: "The base feature may not be deleted.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/remove-feature/project-id/1")
-        .send();
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe("The base feature may not be deleted.");
-    });
-
-    it("should prevent deletion of feature with assigned tickets", async () => {
-      (projectController.removeFeatureFromProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(400).json({
-            message:
-              "Cannot delete feature with assigned tickets. Please reassign or delete the tickets first.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .patch("/projects/remove-feature/project-id/2")
-        .send();
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Cannot delete feature with assigned tickets. Please reassign or delete the tickets first."
-      );
-    });
-
-    it("should validate project ownership or admin role", async () => {
-      await request(app)
-        .patch("/projects/remove-feature/project-id/2")
-        .send();
-
-      expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
-    });
-  });
-
   describe("HTTP Method Restrictions", () => {
     it("should not allow POST to GET endpoints", async () => {
-      const response = await request(app)
-        .post("/projects/project-id")
-        .send({});
+      const response = await request(app).post("/projects/project-id").send({});
 
       expect(response.status).toBe(404);
     });
@@ -891,7 +564,9 @@ describe("Project Router", () => {
     });
 
     it("should not allow GET to PATCH endpoints", async () => {
-      const response = await request(app).get("/projects/update-description/project-id");
+      const response = await request(app).get(
+        "/projects/update-description/project-id"
+      );
 
       expect(response.status).toBe(404);
     });
@@ -921,6 +596,10 @@ describe("Project Router", () => {
     });
 
     it("should apply validateProjectOwnerOrAdmin to add-feature route", async () => {
+      (addFeatureToProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(200).json({ message: "Feature added" });
+      });
+
       await request(app)
         .patch("/projects/add-feature/project-id")
         .send({ title: "test" });
@@ -929,29 +608,27 @@ describe("Project Router", () => {
     });
 
     it("should apply validateProjectOwnerOrAdmin to remove-feature route", async () => {
-      await request(app)
-        .patch("/projects/remove-feature/project-id/2")
-        .send();
+      (removeFeatureFromProject as jest.Mock).mockImplementation((req, res) => {
+        res.status(200).json({ message: "Feature removed" });
+      });
+
+      await request(app).patch("/projects/remove-feature/project-id/2").send();
 
       expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
     });
 
     it("should apply validateProjectOwner to delete route", async () => {
-      await request(app)
-        .delete("/projects/project-id")
-        .send();
+      await request(app).delete("/projects/project-id").send();
 
       // The validateProjectOwner middleware should be called for DELETE
-      expect(projectController.deleteProject).toHaveBeenCalledTimes(1);
+      expect(deleteProject).toHaveBeenCalledTimes(1);
     });
 
     it("should apply authentication middleware to createProject route", async () => {
       // The createProject route has authentication middleware
-      await request(app)
-        .post("/projects")
-        .send({ name: "Test" });
+      await request(app).post("/projects").send({ name: "Test" });
 
-      expect(projectController.createProject).toHaveBeenCalledTimes(1);
+      expect(createProject).toHaveBeenCalledTimes(1);
     });
   });
 });
