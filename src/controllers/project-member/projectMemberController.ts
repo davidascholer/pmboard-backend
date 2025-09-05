@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import prisma from "../../prismaClient";
-import { projectReturnSelect } from "../../lib/returnSignatures";
 import { AuthenticatedRequest } from "../../middleware/authenticateUser";
 
 export const getProjectMembers = async (req: Request, res: Response) => {
