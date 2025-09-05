@@ -5,6 +5,7 @@ import { authenticateUser } from "../middleware/auth";
 import * as projectController from "../controllers/project/projectController";
 import validateProjectOwnerOrAdmin from "../middleware/validateProjectOwnerOrAdmin";
 import validateProjectOwnerOrMember from "../middleware/validateProjectOwnerOrMember";
+import validateProjectOwner from "../middleware/validateProjectOwner";
 
 // Mock the auth middleware
 jest.mock("../middleware/auth", () => ({
@@ -52,6 +53,7 @@ jest.mock("../controllers/project/projectController", () => ({
   createProject: jest.fn(),
   deleteProject: jest.fn(),
   updateDescription: jest.fn(),
+  updateStatus: jest.fn(),
   addFeatureToProject: jest.fn(),
   removeFeatureFromProject: jest.fn(),
 }));
@@ -113,7 +115,6 @@ describe("Project Router", () => {
     it("should create a new project successfully", async () => {
       const requestBody = {
         name: "New Project",
-        ownerId: "user-id",
         description: "New project description",
         projectType: "KANBAN",
       };
@@ -122,8 +123,9 @@ describe("Project Router", () => {
         id: "new-project-id",
         name: "New Project",
         description: "New project description",
-        ownerId: "user-id",
+        ownerId: "user-id", // This comes from authenticated user
         projectType: "KANBAN",
+        status: "ACTIVE", // Default status
         features: [
           {
             id: 1,
@@ -148,15 +150,15 @@ describe("Project Router", () => {
       expect(projectController.createProject).toHaveBeenCalledTimes(1);
     });
 
-    it("should require name and ownerId fields", async () => {
+    it("should require name field", async () => {
       const requestBody = {
-        description: "Missing required fields",
+        description: "Missing required name field",
       };
 
       (projectController.createProject as jest.Mock).mockImplementation(
         (req, res) => {
           res.status(400).json({
-            message: "The fields name and ownerId are required.",
+            message: "The name field is required.",
           });
         }
       );
@@ -166,15 +168,12 @@ describe("Project Router", () => {
         .send(requestBody);
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "The fields name and ownerId are required."
-      );
+      expect(response.body.message).toBe("The name field is required.");
     });
 
     it("should validate project type", async () => {
       const requestBody = {
         name: "Test Project",
-        ownerId: "user-id",
         projectType: "INVALID_TYPE",
       };
 
@@ -200,7 +199,6 @@ describe("Project Router", () => {
     it("should handle empty name", async () => {
       const requestBody = {
         name: "",
-        ownerId: "user-id",
       };
 
       (projectController.createProject as jest.Mock).mockImplementation(
@@ -221,16 +219,15 @@ describe("Project Router", () => {
       );
     });
 
-    it("should handle invalid ownerId", async () => {
+    it("should handle unauthorized requests", async () => {
       const requestBody = {
         name: "Test Project",
-        ownerId: "",
       };
 
       (projectController.createProject as jest.Mock).mockImplementation(
         (req, res) => {
-          res.status(400).json({
-            message: "Invalid ownerId. It must be a non-empty string.",
+          res.status(401).json({
+            message: "Unauthorized",
           });
         }
       );
@@ -239,45 +236,21 @@ describe("Project Router", () => {
         .post("/projects")
         .send(requestBody);
 
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid ownerId. It must be a non-empty string."
-      );
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe("Unauthorized");
     });
 
-    it("should handle non-existent owner", async () => {
+    it("should create project with default KANBAN type and ACTIVE status", async () => {
       const requestBody = {
         name: "Test Project",
-        ownerId: "nonexistent-user-id",
-      };
-
-      (projectController.createProject as jest.Mock).mockImplementation(
-        (req, res) => {
-          res.status(404).json({
-            message: "Owner not found.",
-          });
-        }
-      );
-
-      const response = await request(app)
-        .post("/projects")
-        .send(requestBody);
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe("Owner not found.");
-    });
-
-    it("should create project with default KANBAN type", async () => {
-      const requestBody = {
-        name: "Test Project",
-        ownerId: "user-id",
       };
 
       const mockResponse = {
         id: "new-project-id",
         name: "Test Project",
-        ownerId: "user-id",
+        ownerId: "user-id", // From authenticated user
         projectType: "KANBAN", // Default type
+        status: "ACTIVE", // Default status
         features: [
           {
             id: 1,
@@ -299,6 +272,8 @@ describe("Project Router", () => {
 
       expect(response.status).toBe(201);
       expect(response.body.projectType).toBe("KANBAN");
+      expect(response.body.status).toBe("ACTIVE");
+      expect(response.body.ownerId).toBe("user-id");
     });
   });
 
@@ -463,6 +438,135 @@ describe("Project Router", () => {
         .send(requestBody);
 
       expect(validateProjectOwnerOrAdmin).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("PATCH /projects/update-status/:id", () => {
+    it("should update project status successfully", async () => {
+      const requestBody = {
+        status: "ARCHIVED",
+      };
+
+      const mockResponse = {
+        id: "project-id",
+        name: "Test Project",
+        status: "ARCHIVED",
+        description: "Test Description",
+        features: [],
+      };
+
+      (projectController.updateStatus as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(200).json(mockResponse);
+        }
+      );
+
+      const response = await request(app)
+        .patch("/projects/update-status/project-id")
+        .send(requestBody);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockResponse);
+      expect(projectController.updateStatus).toHaveBeenCalledTimes(1);
+      expect(validateProjectOwner).toHaveBeenCalledTimes(1);
+    });
+
+    it("should require status field", async () => {
+      const requestBody = {};
+
+      (projectController.updateStatus as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(400).json({
+            message: "The status field is required and must be either ACTIVE or ARCHIVED.",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .patch("/projects/update-status/project-id")
+        .send(requestBody);
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toBe(
+        "The status field is required and must be either ACTIVE or ARCHIVED."
+      );
+    });
+
+    it("should validate status values", async () => {
+      const requestBody = {
+        status: "INVALID_STATUS",
+      };
+
+      (projectController.updateStatus as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(400).json({
+            message: "The status field is required and must be either ACTIVE or ARCHIVED.",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .patch("/projects/update-status/project-id")
+        .send(requestBody);
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toBe(
+        "The status field is required and must be either ACTIVE or ARCHIVED."
+      );
+    });
+
+    it("should handle non-existent project", async () => {
+      const requestBody = {
+        status: "ARCHIVED",
+      };
+
+      (projectController.updateStatus as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(404).json({
+            message: "Project not found",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .patch("/projects/update-status/nonexistent-id")
+        .send(requestBody);
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe("Project not found");
+    });
+
+    it("should handle unauthorized requests", async () => {
+      const requestBody = {
+        status: "ARCHIVED",
+      };
+
+      (projectController.updateStatus as jest.Mock).mockImplementation(
+        (req, res) => {
+          res.status(401).json({
+            message: "Unauthorized",
+          });
+        }
+      );
+
+      const response = await request(app)
+        .patch("/projects/update-status/project-id")
+        .send(requestBody);
+
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe("Unauthorized");
+    });
+
+    it("should validate project ownership", async () => {
+      const requestBody = {
+        status: "ARCHIVED",
+      };
+
+      await request(app)
+        .patch("/projects/update-status/project-id")
+        .send(requestBody);
+
+      expect(validateProjectOwner).toHaveBeenCalledTimes(1);
     });
   });
 

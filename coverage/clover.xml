@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1757032324114" clover="3.2.0">
-  <project timestamp="1757032324114" name="All files">
-    <metrics statements="278" coveredstatements="235" conditionals="128" coveredconditionals="113" methods="44" coveredmethods="40" elements="450" coveredelements="388" complexity="0" loc="278" ncloc="278" packages="6" files="7" classes="7"/>
+<coverage generated="1757056749460" clover="3.2.0">
+  <project timestamp="1757056749460" name="All files">
+    <metrics statements="279" coveredstatements="236" conditionals="128" coveredconditionals="113" methods="44" coveredmethods="40" elements="451" coveredelements="389" complexity="0" loc="279" ncloc="279" packages="6" files="7" classes="7"/>
     <package name="src">
       <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
       <file name="prismaClient.ts" path="/Users/grim/Code/repos/pmboard/pm-board-server/src/prismaClient.ts">
@@ -274,30 +274,31 @@
         <metrics statements="6" coveredstatements="6" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
         <line num="6" count="1" type="stmt"/>
         <line num="24" count="1" type="stmt"/>
-        <line num="58" count="1" type="stmt"/>
-        <line num="64" count="1" type="stmt"/>
-        <line num="70" count="1" type="stmt"/>
-        <line num="96" count="1" type="stmt"/>
+        <line num="59" count="1" type="stmt"/>
+        <line num="65" count="1" type="stmt"/>
+        <line num="71" count="1" type="stmt"/>
+        <line num="97" count="1" type="stmt"/>
       </file>
     </package>
     <package name="src.routes">
-      <metrics statements="30" coveredstatements="30" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <metrics statements="31" coveredstatements="31" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
       <file name="projectRouter.ts" path="/Users/grim/Code/repos/pmboard/pm-board-server/src/routes/projectRouter.ts">
-        <metrics statements="14" coveredstatements="14" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <metrics statements="15" coveredstatements="15" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
         <line num="1" count="1" type="stmt"/>
         <line num="2" count="1" type="stmt"/>
-        <line num="10" count="1" type="stmt"/>
         <line num="11" count="1" type="stmt"/>
         <line num="12" count="1" type="stmt"/>
         <line num="13" count="1" type="stmt"/>
         <line num="14" count="1" type="stmt"/>
-        <line num="16" count="1" type="stmt"/>
+        <line num="15" count="1" type="stmt"/>
         <line num="17" count="1" type="stmt"/>
         <line num="18" count="1" type="stmt"/>
         <line num="19" count="1" type="stmt"/>
-        <line num="24" count="1" type="stmt"/>
-        <line num="29" count="1" type="stmt"/>
-        <line num="35" count="1" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+        <line num="26" count="1" type="stmt"/>
+        <line num="32" count="1" type="stmt"/>
+        <line num="38" count="1" type="stmt"/>
+        <line num="45" count="1" type="stmt"/>
       </file>
       <file name="userRouter.ts" path="/Users/grim/Code/repos/pmboard/pm-board-server/src/routes/userRouter.ts">
         <metrics statements="16" coveredstatements="16" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>

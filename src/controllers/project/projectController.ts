@@ -137,12 +137,20 @@ export const deleteProject = async (req: Request, res: Response) => {
     // Check if the project exists
     const existingProject = await prisma.project.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, status: true },
     });
 
     if (!existingProject) {
       return res.status(404).json({
         message: "Project not found",
+      });
+    }
+
+    // Make sure the project status is ARCHIVED
+    const isArchived = existingProject.status === "ARCHIVED";
+    if (!isArchived) {
+      return res.status(400).json({
+        message: "The project must be archived before deleting features.",
       });
     }
 
@@ -184,6 +192,59 @@ export const deleteProject = async (req: Request, res: Response) => {
     console.error("Error deleting project:", error);
     res.status(500).json({
       message: "An error occurred while deleting the project",
+    });
+  }
+};
+
+export const updateStatus = async (req: Request, res: Response) => {
+  const id: string = req.params.id;
+
+  // Validated the request user
+  const authReq = req as AuthenticatedRequest;
+  if (!authReq.user) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+
+  // Validate request body
+  if (
+    !req.body ||
+    !req.body.status ||
+    (req.body.status !== "ACTIVE" && req.body.status !== "ARCHIVED")
+  ) {
+    return res.status(400).json({
+      message:
+        "The status field is required and must be either ACTIVE or ARCHIVED.",
+    });
+  }
+
+  try {
+    // Check if the project exists
+    const existingProject = await prisma.project.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existingProject) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    // Update the project's status
+    const updatedProject = await prisma.project.update({
+      where: { id },
+      data: { status: req.body.status },
+      select: projectReturnSelect,
+    });
+
+    // Successfully return the updated project
+    res.status(200).json(updatedProject);
+  } catch (error) {
+    console.error("Error updating project status:", error);
+    res.status(500).json({
+      message: "An error occurred while updating the project status",
     });
   }
 };
@@ -258,6 +319,22 @@ export const addFeatureToProject = async (req: Request, res: Response) => {
     });
   }
 
+  // Make sure the title is unique within the project
+  const existingFeature = await prisma.feature.findFirst({
+    where: {
+      projectId,
+      title: req.body.title,
+    },
+    select: { id: true },
+  });
+
+  if (existingFeature) {
+    return res.status(400).json({
+      message: "A feature with this title already exists in the project.",
+    });
+  }
+
+  // Prepare the feature data
   const featureData: {
     title: string;
     description?: string;

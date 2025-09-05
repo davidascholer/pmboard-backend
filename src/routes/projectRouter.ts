@@ -6,6 +6,7 @@ import {
   getProject,
   removeFeatureFromProject,
   updateDescription,
+  updateStatus,
 } from "../controllers/project/projectController";
 import validateProjectOwnerOrAdmin from "../middleware/validateProjectOwnerOrAdmin";
 import validateProjectOwnerOrMember from "../middleware/validateProjectOwnerOrMember";
@@ -21,6 +22,12 @@ projectRouter.patch(
   authenticateUser,
   validateProjectOwnerOrAdmin,
   updateDescription
+);
+projectRouter.patch(
+  "/update-status/:id",
+  authenticateUser,
+  validateProjectOwner,
+  updateStatus
 );
 projectRouter.patch(
   "/add-feature/:id",

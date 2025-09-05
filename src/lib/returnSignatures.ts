@@ -29,6 +29,7 @@ const projectSelect = {
   updatedAt: true,
   projectType: true,
   ownerId: true,
+  status: true,
   members: {
     select: {
       id: true,
