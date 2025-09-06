@@ -18,18 +18,18 @@ projectMemberRouter.get(
   getProjectMembers
 );
 
-projectMemberRouter.delete(
-  "/:project_id/:member_id",
-  authenticateUser,
-  validateProjectOwnerOrAdmin,
-  removeProjectMember
-);
-
 projectMemberRouter.post(
   "/:project_id",
   authenticateUser,
   validateProjectOwnerOrAdmin,
   addProjectMember
+);
+
+projectMemberRouter.delete(
+  "/:project_id/:member_id",
+  authenticateUser,
+  validateProjectOwnerOrAdmin,
+  removeProjectMember
 );
 
 projectMemberRouter.post(

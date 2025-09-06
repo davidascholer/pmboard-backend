@@ -53,7 +53,7 @@ export const addProjectMember = async (req: Request, res: Response) => {
     });
   }
 
-  // Validate role
+  // Validate the request body role
   const validRoles = ["ADMIN", "MEMBER"];
   if (!validRoles.includes(role)) {
     return res.status(400).json({

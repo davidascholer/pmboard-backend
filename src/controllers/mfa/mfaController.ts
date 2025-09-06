@@ -131,15 +131,21 @@ export const sendMfaToken = async (req: Request, res: Response) => {
  */
 const emailMfaToken = async (authReq: AuthenticatedRequest, token: string) => {
   // Create a nodemailer transporter using AWS SES
-  const transporter = nodemailer.createTransport({
+  const transporter = process.env.PROD === "true" ? nodemailer.createTransport({
     host: "email-smtp.us-east-1.amazonaws.com", // Replace with your AWS SES region
     port: 587,
     secure: false, // Use STARTTLS
     auth: {
-      user: process.env.AWS_SES_SMTP_USERNAME, // Your AWS SES SMTP username
-      pass: process.env.AWS_SES_SMTP_PASSWORD, // Your AWS SES SMTP password
+      user: process.env.SMTP_USERNAME, // Your AWS SES SMTP username
+      pass: process.env.SMTP_PASSWORD, // Your AWS SES SMTP password
     },
-  });
+  })
+  : nodemailer.createTransport({
+      host: "localhost", // Replace with your AWS SES region
+        port: 2525,       // The mapped SMTP port
+        secure: false,    // smtp4dev typically doesn't use SSL/TLS by default
+        ignoreTLS: true,  // Ignore TLS errors for local testing
+    });
 
   // Define email options
   const mailOptions = {
