@@ -96,7 +96,7 @@ export const userSignIn = async (req: Request, res: Response) => {
     return res
       .setHeader(
         "Set-Cookie",
-        `pmboard-r-token=${generateJWT(user, "refresh", "1d")}; HttpOnly; Secure; Path=/; Max-Age=86400; SameSite=Lax`
+        `pmboard-r-token=${generateJWT(user, "refresh", "1m")}; HttpOnly; Secure; Path=/; Max-Age=86400; SameSite=Lax`
       )
       .status(200)
       .json({

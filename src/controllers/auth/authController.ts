@@ -47,6 +47,11 @@ export const refreshToken = async (req: Request, res: Response) => {
       a: generateJWT(user, "access", "1h"),
     });
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({
+        message: "Refresh token has expired",
+      });
+    }
     console.error("Error fetching user:", error);
     res.status(404).json({
       message: "Unable to refresh access token",
