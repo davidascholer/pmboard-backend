@@ -5,10 +5,12 @@ import jwt from "jsonwebtoken";
 
 export const refreshToken = async (req: Request, res: Response) => {
   try {
-    // Validate refresh token parameter
-    if (!req.body.r || typeof req.body.r !== "string") {
+    // Validate refresh token cookie
+    const refreshToken = req.cookies["pmboard-r-token"];
+    console.log("Refresh token from cookie:", refreshToken);
+    if (!refreshToken || typeof refreshToken !== "string") {
       return res.status(400).json({
-        message: "Refresh token is required",
+        message: "No refresh token cookie provided",
       });
     }
 
@@ -19,7 +21,7 @@ export const refreshToken = async (req: Request, res: Response) => {
       });
     }
 
-    const decode = jwt.verify(req.body.r, process.env.JWT_SECRET) as {
+    const decode = jwt.verify(refreshToken, process.env.JWT_SECRET) as {
       email: string;
       id: string;
     };
@@ -48,7 +50,6 @@ export const refreshToken = async (req: Request, res: Response) => {
     console.error("Error fetching user:", error);
     res.status(404).json({
       message: "Unable to refresh access token",
-      error: (error as Error).message,
     });
   }
 };

@@ -22,10 +22,10 @@ const userRouter = express.Router();
 userRouter.get("/", authenticateUser, getAuthenticatedUser);
 userRouter.post("/signin", userSignIn);
 userRouter.post("/signup", userSignUp);
-userRouter.patch("/update-password/:token", updateUserPassword);
+userRouter.patch("/update-password", updateUserPassword);
 userRouter.patch("/update-settings", authenticateUser, updateUserSettings);
-userRouter.patch("/activate/:token", authenticateUser, userActivate);
-userRouter.patch("/deactivate/:token", authenticateUser, userDeactivate);
+userRouter.patch("/activate", userActivate);
+userRouter.patch("/deactivate", authenticateUser, userDeactivate);
 userRouter.get(
   "/verify-membership",
   authenticateUser,

@@ -27,11 +27,11 @@ export const authenticateUser = async (
   }
 
   try {
-      const decode = verify(token, process.env.JWT_SECRET || "") as {
-        email: string;
-        id: string;
-      };
-  
+    const decode = verify(token, process.env.JWT_SECRET || "") as {
+      email: string;
+      id: string;
+    };
+
     const user = await prisma.user.findUnique({
       where: { email: decode.email },
       select: userReturnSelect,
@@ -39,6 +39,15 @@ export const authenticateUser = async (
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
+
+    // Check the user is active
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: "User account is not active",
+      });
+    }
+
+    // Attach the user to the request object
     req.user = user ?? undefined;
     next();
   } catch (error) {

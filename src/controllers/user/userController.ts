@@ -5,6 +5,8 @@ import { User } from "@prisma/client";
 import { hash, compare } from "bcrypt";
 import { generateJWT } from "../auth/util";
 import { AuthenticatedRequest } from "../../middleware/authenticateUser";
+import { mfaEmailToken } from "../mfa/mfaController";
+import { emailMfaToken, mfaCreateToken } from "../mfa/util";
 
 export const getAuthenticatedUser = async (req: Request, res: Response) => {
   try {
@@ -70,13 +72,37 @@ export const userSignIn = async (req: Request, res: Response) => {
       });
     }
 
+    // Check the user is active
+    // Return teapot as a unique status code to tell the client to prompt for activation
+    if (!user.isActive) {
+      // Re-send activation email
+      const token = await mfaCreateToken(user);
+      (req as AuthenticatedRequest).user = user ?? undefined;
+      emailMfaToken(req, token);
+      return res.status(418).json({
+        message: "User account is not active. Activation email re-sent.",
+      });
+    }
+
     // Successfully return the user info w access and refresh tokens
-    const { password: _password, ...partialUser } = user;
-    return res.status(200).json({
-      ...partialUser,
-      a: generateJWT(user, "access", "1h"),
-      r: generateJWT(user, "refresh", "30d"),
-    });
+    const {
+      password: _password,
+      isActive: _isActive,
+      nextMembership: _nextMembership,
+      updatedAt: _updatedAt,
+      id: _id,
+      ...partialUser
+    } = user;
+    return res
+      .setHeader(
+        "Set-Cookie",
+        `pmboard-r-token=${generateJWT(user, "refresh", "1d")}; HttpOnly; Secure; Path=/; Max-Age=86400; SameSite=Lax`
+      )
+      .status(200)
+      .json({
+        ...partialUser,
+        a: generateJWT(user, "access", "1h"),
+      });
   } catch (error) {
     console.error("Error fetching user:", error);
     return res.status(500).json({
@@ -86,7 +112,6 @@ export const userSignIn = async (req: Request, res: Response) => {
 };
 
 export const userSignUp = async (req: Request, res: Response) => {
-  console.log("create request body", req.body);
   // Validate email parameter
   if (!req.body.email || typeof req.body.email !== "string") {
     return res.status(400).json({
@@ -100,6 +125,17 @@ export const userSignUp = async (req: Request, res: Response) => {
       message: "Invalid password parameter",
     });
   }
+
+  // Validate password confirm parameter
+  if (
+    !req.body.passwordConfirm ||
+    typeof req.body.passwordConfirm !== "string"
+  ) {
+    return res.status(400).json({
+      message: "Invalid password confirm parameter",
+    });
+  }
+
   // Validate name parameter
   if (!req.body.name || typeof req.body.name !== "string") {
     return res.status(400).json({
@@ -124,12 +160,17 @@ export const userSignUp = async (req: Request, res: Response) => {
         });
       });
     if (user) {
-      return res.status(404).json({
+      return res.status(409).json({
         message: "User already exists",
       });
     }
 
-    // Todo: Validate email and password format
+    // Check if passwords match
+    if (req.body.password !== req.body.passwordConfirm) {
+      return res.status(400).json({
+        message: "Passwords do not match",
+      });
+    }
 
     // Has the password
     const hashedPassword = await hash(req.body.password, 10);
@@ -149,10 +190,18 @@ export const userSignUp = async (req: Request, res: Response) => {
       select: userReturnSelect,
     });
     const { password: _password, ...newpartialUser } = newUser;
+
+    // Send activation email
+    const token = await mfaCreateToken(newUser);
+    (req as AuthenticatedRequest).user = newUser ?? undefined;
+    emailMfaToken(req, token);
+
+    // Only create and send the tokens if account activation is not required
     res.status(201).json({
-      ...newpartialUser,
-      a: generateJWT(newUser, "access", "1h"),
-      r: generateJWT(newUser, "refresh", "30d"),
+      message:
+        "User created successfully. Please check your email to activate your account.",
+      // a: generateJWT(newUser, "access", "1h"),
+      // r: generateJWT(newUser, "refresh", "30d"),
     });
   } catch (error) {
     console.error("Error creating user:", error);
@@ -163,53 +212,60 @@ export const userSignUp = async (req: Request, res: Response) => {
 };
 
 export const userActivate = async (req: Request, res: Response) => {
-  // Validate token in url parameter
-  const token = req.params.token;
-  if (!token || typeof token !== "string") {
+  // Validate code in url parameter
+  const code = req.body.code;
+  if (!code || typeof code !== "string") {
     return res.status(400).json({
-      message: "Invalid token parameter",
+      message: "A code is required",
     });
   }
 
   try {
-    // Find the token and associated user
-    const tokenRecord = await prisma.token.findUnique({
-      where: { token: token },
+    // Find the code and associated user
+    const codeRecord = await prisma.token.findUnique({
+      where: { token: code },
       include: { user: true },
     });
 
-    // Check if token exists
-    if (!tokenRecord) {
+    // Check if code exists
+    if (!codeRecord) {
       return res.status(404).json({
-        message: "Token not found",
+        message: "Code not found",
       });
     }
 
-    // Check if token is expired (5 minutes expiration)
+    // Check if code is expired (5 minutes expiration)
     const now = new Date();
-    console.log("Token expiration:", tokenRecord.expiresAt, "Now:", now);
-    if (tokenRecord.expiresAt < now) {
+    console.log("Code expiration:", codeRecord.expiresAt, "Now:", now);
+    if (codeRecord.expiresAt < now) {
       return res.status(400).json({
-        message: "Token has expired",
+        message: "Code has expired",
       });
     }
 
     // Update user to active status
     const updatedUser = await prisma.user.update({
-      where: { id: tokenRecord.userId },
+      where: { id: codeRecord.userId },
       data: { isActive: true },
       select: userReturnSelect,
     });
 
-    // Delete the token after successful activation
+    // Delete the code after successful activation
     await prisma.token.delete({
-      where: { id: tokenRecord.id },
+      where: { id: codeRecord.id },
     });
 
     const { password: _password, ...partialUser } = updatedUser;
     res.status(200).json({
       message: "User activated successfully",
-      user: partialUser,
+      user: {
+        id: partialUser.id,
+        name: partialUser.name,
+        email: partialUser.email,
+        createdAt: partialUser.createdAt,
+        updatedAt: partialUser.updatedAt,
+        isActive: partialUser.isActive,
+      },
     });
   } catch (error) {
     console.error("Error activating user:", error);
@@ -221,10 +277,10 @@ export const userActivate = async (req: Request, res: Response) => {
 
 export const userDeactivate = async (req: Request, res: Response) => {
   // Validate token parameter
-  const token = req.params.token;
+  const token = req.body.token;
   if (!token || typeof token !== "string") {
     return res.status(400).json({
-      message: "Invalid token parameter",
+      message: "A code is required",
     });
   }
 
@@ -345,14 +401,27 @@ export const createUserToken = async (user: User) => {
 
 /**
  * Updates the password for a user
- * @urlparam token - The token in the URL to verify the user (to lookup the user while also verifying the email)
  * @param req.body.email - The email of the user
  * @param req.body.newPassword - The new password for the user
+ * @param req.body.token - The token in the URL to verify the user (to lookup the user while also verifying the email)
  * @returns Success or error response
  */
 export const updateUserPassword = async (req: Request, res: Response) => {
-  // Validate token url param
-  const token = req.params.token;
+  // Validate the token parameter
+  if (!req.body.token || typeof req.body.token !== "string") {
+    return res.status(400).json({
+      message: "Invalid token parameter",
+    });
+  }
+
+  const token = req.body.token;
+
+  // Validate the email parameter
+  if (!req.body.email || typeof req.body.email !== "string") {
+    return res.status(400).json({
+      message: "Invalid email parameter",
+    });
+  }
 
   // Validate the email parameter
   if (!req.body.email || typeof req.body.email !== "string") {

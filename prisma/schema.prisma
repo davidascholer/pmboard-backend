@@ -50,7 +50,7 @@ model NextMembership {
 
 model Token {
   id        String   @id @default(uuid())
-  token     String   @unique @default(uuid())
+  token     String   @unique  @default(dbgenerated("FLOOR(RANDOM() * 900000) + 100000")) @db.VarChar(6) // 6 digit numeric token
   expiresAt DateTime @default(dbgenerated("(NOW() AT TIME ZONE 'UTC') + INTERVAL '5 minutes'"))
   createdAt DateTime @default(now()) @db.Timestamp(3)
   userId    String   @unique

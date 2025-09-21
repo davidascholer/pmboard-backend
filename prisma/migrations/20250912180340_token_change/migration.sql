@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "public"."Token" ALTER COLUMN "token" SET DEFAULT FLOOR(RANDOM() * 900000) + 100000,
+ALTER COLUMN "expiresAt" SET DEFAULT (NOW() AT TIME ZONE 'UTC') + INTERVAL '5 minutes';

@@ -1,4 +1,5 @@
-import { mfaEmailToken, verifyMfaToken, deleteMfaToken } from "./mfaController";
+import { mfaEmailToken } from "./mfaController";
+import { verifyMfaToken, deleteMfaToken } from "./util";
 import { User } from "@prisma/client";
 
 // Mock the prisma client
